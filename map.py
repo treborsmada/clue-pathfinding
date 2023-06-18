@@ -418,11 +418,11 @@ class Map:
 
 def combine_base_images(name):
     img = Image.new("RGBA", size=(768, 768))
-    for x in range(3):
-        for y in range(3):
+    for y in range(3):
+        for x in range(3):
             img.paste(Image.open(
-                "Images/0_" + str(49 + y) + "_" + str(54 - x) + ".png"),
-                      (0 + y * 256, 0 + x * 256))
+                "Images/0_" + str(49 + x) + "_" + str(54 - y) + ".png"),
+                      (0 + x * 256, 0 + y * 256))
 
     img.save("Images/"+name+"Map.png")
 
