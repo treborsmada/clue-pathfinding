@@ -1,4 +1,6 @@
 from map import *
+import queue as qqueue
+from itertools import count
 
 movelist = ["walk", "surge", "bd", "bd_surge", "surge_bd", "bd_escape", "escape_bd", "surge_walk", "bd_walk",
             "escape_walk"]
@@ -89,6 +91,10 @@ class State:
     def can_escape(self):
         return self.secd[0] == 0 or self.secd[2] == 0
 
+    def min_cd(self):
+        cds = [(self.secd[0], "se"), (self.secd[1], "s"), (self.secd[2], "e"), (self.bdcd, "bd")]
+        cds = sorted(cds, key=lambda tup: tup[0])
+        return cds[0]
 
 def walk_path(start, end, map):
     path = [start]
@@ -568,5 +574,269 @@ def bfs_path_end_buffer(start_state, end, map):
                                 if end[0]-1 <= next3.pos[0] <= end[0]+1 and end[1]-1 <= next3.pos[1] <= end[1]+1:
                                     return new_path, new_path_moves
 
+def a_star_end_buffer(start_state, end, map, heuristic):
+    unique = count()
+    path = [(start_state, start_state, start_state)]
+    path_moves = []
+    if end[0] - 1 <= start_state.pos[0] <= end[0] + 1 and end[1] - 1 <= start_state.pos[1] <= end[1] + 1:
+        return path
+    queue = qqueue.PriorityQueue()
+    queue.put((0, next(unique), (path, path_moves)))
+    cost: dict[State, int] = {start_state: 0}
+    first = True
+    while not queue.empty():
+        path = queue.get()[2]
+        current_node = path[0][-1][-1]
+        node = path[0][-1][-1]
+        if not first:
+            node = node.update()
+        first = False
+        if end[0] - 1 <= node.pos[0] <= end[0] + 1 and end[1] - 1 <= node.pos[1] <= end[1] + 1:
+            return path
+        # wait
+        new_path = path[0].copy()
+        new_path_moves = path[1].copy()
+        new_path.append((node, node, node))
+        new_path_moves.append("wait")
+        if node not in cost or cost[current_node] + 1 < cost[node]:
+            cost[node] = cost[current_node] + 1
+            f = cost[current_node] + 1 + heuristic(node, end)
+            queue.put((f, next(unique), (new_path, new_path_moves)))
+        # walk
+        walk_adj = map.one_tick_walk_dir(node.pos[0], node.pos[1])
+        for i in range(len(walk_adj[0])):
+            next1 = node.move(walk_adj[0][i][0], walk_adj[0][i][1], walk_adj[1][i])
+            new_path = path[0].copy()
+            new_path_moves = path[1].copy()
+            new_path.append((next1, next1, next1))
+            new_path_moves.append("walk")
+            if next1 not in cost or cost[current_node] + 1 < cost[next1]:
+                cost[next1] = cost[current_node] + 1
+                f = cost[current_node] + 1 + heuristic(next1, end)
+                queue.put((f, next(unique), (new_path, new_path_moves)))
+            if end[0] - 1 <= next1.pos[0] <= end[0] + 1 and end[1] - 1 <= next1.pos[1] <= end[1] + 1:
+                return new_path, new_path_moves
+        # surge+bd+walk
+        if node.can_surge():
+            next1 = node.surge()
+            new_path = path[0].copy()
+            new_path_moves = path[1].copy()
+            new_path.append((next1, next1, next1))
+            new_path_moves.append("surge")
+            if next1 not in cost or cost[current_node] + 1 < cost[next1]:
+                cost[next1] = cost[current_node] + 1
+                f = cost[current_node] + 1 + heuristic(next1, end)
+                queue.put((f, next(unique), (new_path, new_path_moves)))
+            if end[0] - 1 <= next1.pos[0] <= end[0] + 1 and end[1] - 1 <= next1.pos[1] <= end[1] + 1:
+                return new_path, new_path_moves
+            walk_adj = map.one_tick_walk_dir(next1.pos[0], next1.pos[1])
+            for j in range(len(walk_adj[0])):
+                next2 = next1.move(walk_adj[0][j][0], walk_adj[0][j][1], walk_adj[1][j])
+                new_path = path[0].copy()
+                new_path_moves = path[1].copy()
+                new_path.append((next1, next1, next2))
+                new_path_moves.append("surge walk")
+                if next2 not in cost or cost[current_node] + 1 < cost[next2]:
+                    cost[next2] = cost[current_node] + 1
+                    f = cost[current_node] + 1 + heuristic(next2, end)
+                    queue.put((f, next(unique), (new_path, new_path_moves)))
+                if end[0] - 1 <= next2.pos[0] <= end[0] + 1 and end[1] - 1 <= next2.pos[1] <= end[1] + 1:
+                    return new_path, new_path_moves
+            if next1.can_bd():
+                bd_adj = map.bd_range_dir(next1.pos[0], next1.pos[1])
+                for i in range(len(bd_adj[0])):
+                    next2 = next1.bd(bd_adj[0][i][0], bd_adj[0][i][1], bd_adj[1][i])
+                    new_path = path[0].copy()
+                    new_path_moves = path[1].copy()
+                    new_path.append((next1, next1, next2))
+                    new_path_moves.append("surge bd")
+                    if next2 not in cost or cost[current_node] + 1 < cost[next2]:
+                        cost[next2] = cost[current_node] + 1
+                        f = cost[current_node] + 1 + heuristic(next2, end)
+                        queue.put((f, next(unique), (new_path, new_path_moves)))
+                    if end[0] - 1 <= next2.pos[0] <= end[0] + 1 and end[1] - 1 <= next2.pos[1] <= end[1] + 1:
+                        return new_path, new_path_moves
+                    walk_adj = map.one_tick_walk_dir(next2.pos[0], next2.pos[1])
+                    for j in range(len(walk_adj[0])):
+                        next3 = next2.move(walk_adj[0][j][0], walk_adj[0][j][1], walk_adj[1][j])
+                        new_path = path[0].copy()
+                        new_path_moves = path[1].copy()
+                        new_path.append((next1, next2, next3))
+                        new_path_moves.append("surge bd walk")
+                        if next3 not in cost or cost[current_node] + 1 < cost[next3]:
+                            cost[next3] = cost[current_node] + 1
+                            f = cost[current_node] + 1 + heuristic(next3, end)
+                            queue.put((f, next(unique), (new_path, new_path_moves)))
+                        if end[0] - 1 <= next3.pos[0] <= end[0] + 1 and end[1] - 1 <= next3.pos[1] <= end[1] + 1:
+                            return new_path, new_path_moves
+        # bd+surge/escape+walk
+        if node.can_bd():
+            bd_adj = map.bd_range_dir(node.pos[0], node.pos[1])
+            for i in range(len(bd_adj[0])):
+                next1 = node.bd(bd_adj[0][i][0], bd_adj[0][i][1], bd_adj[1][i])
+                new_path = path[0].copy()
+                new_path_moves = path[1].copy()
+                new_path.append((next1, next1, next1))
+                new_path_moves.append("bd")
+                if next1 not in cost or cost[current_node] + 1 < cost[next1]:
+                    cost[next1] = cost[current_node] + 1
+                    f = cost[current_node] + 1 + heuristic(next1, end)
+                    queue.put((f, next(unique), (new_path, new_path_moves)))
+                if end[0] - 1 <= next1.pos[0] <= end[0] + 1 and end[1] - 1 <= next1.pos[1] <= end[1] + 1:
+                    return new_path, new_path_moves
+                walk_adj = map.one_tick_walk_dir(next1.pos[0], next1.pos[1])
+                for j in range(len(walk_adj[0])):
+                    next2 = next1.move(walk_adj[0][j][0], walk_adj[0][j][1], walk_adj[1][j])
+                    new_path = path[0].copy()
+                    new_path_moves = path[1].copy()
+                    new_path.append((next1, next1, next2))
+                    new_path_moves.append("bd walk")
+                    if next2 not in cost or cost[current_node] + 1 < cost[next2]:
+                        cost[next2] = cost[current_node] + 1
+                        f = cost[current_node] + 1 + heuristic(next2, end)
+                        queue.put((f, next(unique), (new_path, new_path_moves)))
+                    if end[0] - 1 <= next2.pos[0] <= end[0] + 1 and end[1] - 1 <= next2.pos[1] <= end[1] + 1:
+                        return new_path, new_path_moves
+                if next1.can_surge():
+                    next2 = next1.surge()
+                    new_path = path[0].copy()
+                    new_path_moves = path[1].copy()
+                    new_path.append((next1, next1, next2))
+                    new_path_moves.append("bd surge")
+                    if next2 not in cost or cost[current_node] + 1 < cost[next2]:
+                        cost[next2] = cost[current_node] + 1
+                        f = cost[current_node] + 1 + heuristic(next2, end)
+                        queue.put((f, next(unique), (new_path, new_path_moves)))
+                    if end[0] - 1 <= next2.pos[0] <= end[0] + 1 and end[1] - 1 <= next2.pos[1] <= end[1] + 1:
+                        return new_path, new_path_moves
+                    walk_adj = map.one_tick_walk_dir(next2.pos[0], next2.pos[1])
+                    for j in range(len(walk_adj[0])):
+                        next3 = next2.move(walk_adj[0][j][0], walk_adj[0][j][1], walk_adj[1][j])
+                        new_path = path[0].copy()
+                        new_path_moves = path[1].copy()
+                        new_path.append((next1, next2, next3))
+                        new_path_moves.append("bd surge walk")
+                        if next3 not in cost or cost[current_node] + 1 < cost[next3]:
+                            cost[next3] = cost[current_node] + 1
+                            f = cost[current_node] + 1 + heuristic(next3, end)
+                            queue.put((f, next(unique), (new_path, new_path_moves)))
+                        if end[0] - 1 <= next3.pos[0] <= end[0] + 1 and end[1] - 1 <= next3.pos[1] <= end[1] + 1:
+                            return new_path, new_path_moves
+                if next1.can_escape():
+                    next2 = next1.escape()
+                    new_path = path[0].copy()
+                    new_path_moves = path[1].copy()
+                    new_path.append((next1, next1, next2))
+                    new_path_moves.append("bd escape")
+                    if next2 not in cost or cost[current_node] + 1 < cost[next2]:
+                        cost[next2] = cost[current_node] + 1
+                        f = cost[current_node] + 1 + heuristic(next2, end)
+                        queue.put((f, next(unique), (new_path, new_path_moves)))
+                    if end[0] - 1 <= next2.pos[0] <= end[0] + 1 and end[1] - 1 <= next2.pos[1] <= end[1] + 1:
+                        return new_path, new_path_moves
+                    walk_adj = map.one_tick_walk_dir(next2.pos[0], next2.pos[1])
+                    for j in range(len(walk_adj[0])):
+                        next3 = next2.move(walk_adj[0][j][0], walk_adj[0][j][1], walk_adj[1][j])
+                        new_path = path[0].copy()
+                        new_path_moves = path[1].copy()
+                        new_path.append((next1, next2, next3))
+                        new_path_moves.append("bd escape walk")
+                        if next3 not in cost or cost[current_node] + 1 < cost[next3]:
+                            cost[next3] = cost[current_node] + 1
+                            f = cost[current_node] + 1 + heuristic(next3, end)
+                            queue.put((f, next(unique), (new_path, new_path_moves)))
+                        if end[0] - 1 <= next3.pos[0] <= end[0] + 1 and end[1] - 1 <= next3.pos[1] <= end[1] + 1:
+                            return new_path, new_path_moves
+        # escape+bd+walk
+        if node.can_escape():
+            next1 = node.escape()
+            new_path = path[0].copy()
+            new_path_moves = path[1].copy()
+            new_path.append((next1, next1, next1))
+            new_path_moves.append("escape")
+            if next1 not in cost or cost[current_node] + 1 < cost[next1]:
+                cost[next1] = cost[current_node] + 1
+                f = cost[current_node] + 1 + heuristic(next1, end)
+                queue.put((f, next(unique), (new_path, new_path_moves)))
+            if end[0] - 1 <= next1.pos[0] <= end[0] + 1 and end[1] - 1 <= next1.pos[1] <= end[1] + 1:
+                return new_path, new_path_moves
+            walk_adj = map.one_tick_walk_dir(next1.pos[0], next1.pos[1])
+            for j in range(len(walk_adj[0])):
+                next2 = next1.move(walk_adj[0][j][0], walk_adj[0][j][1], walk_adj[1][j])
+                new_path = path[0].copy()
+                new_path_moves = path[1].copy()
+                new_path.append((next1, next1, next2))
+                new_path_moves.append("escape walk")
+                if next2 not in cost or cost[current_node] + 1 < cost[next2]:
+                    cost[next2] = cost[current_node] + 1
+                    f = cost[current_node] + 1 + heuristic(next2, end)
+                    queue.put((f, next(unique), (new_path, new_path_moves)))
+                if end[0] - 1 <= next2.pos[0] <= end[0] + 1 and end[1] - 1 <= next2.pos[1] <= end[1] + 1:
+                    return new_path, new_path_moves
+            if next1.can_bd():
+                bd_adj = map.bd_range_dir(next1.pos[0], next1.pos[1])
+                for i in range(len(bd_adj[0])):
+                    next2 = next1.bd(bd_adj[0][i][0], bd_adj[0][i][1], bd_adj[1][i])
+                    new_path = path[0].copy()
+                    new_path_moves = path[1].copy()
+                    new_path.append((next1, next1, next2))
+                    new_path_moves.append("escape bd")
+                    if next2 not in cost or cost[current_node] + 1 < cost[next2]:
+                        cost[next2] = cost[current_node] + 1
+                        f = cost[current_node] + 1 + heuristic(next2, end)
+                        queue.put((f, next(unique), (new_path, new_path_moves)))
+                    if end[0] - 1 <= next2.pos[0] <= end[0] + 1 and end[1] - 1 <= next2.pos[1] <= end[1] + 1:
+                        return new_path, new_path_moves
+                    walk_adj = map.one_tick_walk_dir(next2.pos[0], next2.pos[1])
+                    for j in range(len(walk_adj[0])):
+                        next3 = next2.move(walk_adj[0][j][0], walk_adj[0][j][1], walk_adj[1][j])
+                        new_path = path[0].copy()
+                        new_path_moves = path[1].copy()
+                        new_path.append((next1, next2, next3))
+                        new_path_moves.append("escape bd walk")
+                        if next3 not in cost or cost[current_node] + 1 < cost[next3]:
+                            cost[next3] = cost[current_node] + 1
+                            f = cost[current_node] + 1 + heuristic(next3, end)
+                            queue.put((f, next(unique), (new_path, new_path_moves)))
+                        if end[0] - 1 <= next3.pos[0] <= end[0] + 1 and end[1] - 1 <= next3.pos[1] <= end[1] + 1:
+                            return new_path, new_path_moves
+#heuristic functions
+def l_infinity(state, end):
+    distance = max(abs(state.pos[0] - end[0]), abs(state.pos[1] - end[1])) - 1
+    if distance <= 0:
+        return 0
+    return distance/22
+
+def l_infinity_cds(state, end):
+    state = state.update()
+    distance = max(abs(state.pos[0] - end[0]), abs(state.pos[1] - end[1])) - 1
+    if distance <= 0:
+        return 0
+    ticks_left = distance/2
+    ticks = 0
+    while ticks_left > 0:
+        curr = state.min_cd()
+        if curr[0] - ticks >= ticks_left:
+            ticks += ticks_left
+            break
+        ticks_left = ticks_left - (curr[0] - ticks)
+        ticks = curr[0]
+        if curr[1] == "se":
+            ticks_left -= 6
+            state.secd = [17 + ticks, max(2, state.secd[1]) + ticks, 17 + ticks]
+            ticks += 1
+        elif curr[1] == "s":
+            ticks_left -= 6
+            state.secd = [max(2, state.secd[1]) + ticks, 17 + ticks, max(2, state.secd[1]) + ticks]
+            ticks += 1
+        elif curr[1] == "e":
+            ticks_left -= 4.5
+            state.secd = [max(2, state.secd[1]) + ticks, max(2, state.secd[1]) + ticks, 17 + ticks]
+            ticks += 1
+        elif curr[1] == "bd":
+            ticks_left -= 6
+            state.bdcd = 17 + ticks
+            ticks += 1
+    return ticks
 
 
