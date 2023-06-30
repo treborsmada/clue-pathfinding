@@ -7,6 +7,7 @@ class Map:
     def __init__(self, cells, walls):
         self.cells = cells
         self.walls = walls
+        self.move_data = []
         self.radius = 20
         self.goals = []
         self.image = Image.new("RGBA", size=(len(cells)*(img_cell_size+1)-1, len(cells[0])*(img_cell_size+1)-1), color=(255, 255, 255, 255))
@@ -126,46 +127,46 @@ class Map:
         return [*set(tiles)]
 
     def bd_range_recursion(self, x, y, prioritylist, tiles, dist):
-        currmove = self.one_tile_movement(x, y)
+        currmove = self.move_data[x][y]
         adj = Map.adj_positions(x, y)
-        if currmove[prioritylist[0]] and dist[0] < 10 and dist[1] < 10:
+        if free_direction(currmove, prioritylist[0]) and dist[0] < 10 and dist[1] < 10:
             next = adj[prioritylist[0]]
             tiles.append(next)
             temp = (x, y)
             tempmove = currmove
             for i in range(10-dist[0]):
-                if tempmove[prioritylist[1]]:
+                if free_direction(tempmove, prioritylist[1]):
                     temp = Map.adj_positions(temp[0], temp[1])[prioritylist[1]]
                     tiles.append(temp)
-                    tempmove = self.one_tile_movement(temp[0], temp[1])
+                    tempmove = self.move_data[temp[0]][temp[1]]
                 else:
                     break
             temp = (x, y)
             tempmove = currmove
             for i in range(10-dist[1]):
-                if tempmove[prioritylist[2]]:
+                if free_direction(tempmove, prioritylist[2]):
                     temp = Map.adj_positions(temp[0], temp[1])[prioritylist[2]]
                     tiles.append(temp)
-                    tempmove = self.one_tile_movement(temp[0], temp[1])
+                    tempmove = self.move_data[temp[0]][temp[1]]
                 else:
                     break
             dist = (dist[0]+1, dist[1]+1)
             self.bd_range_recursion(next[0], next[1], prioritylist, tiles, dist)
-        elif currmove[prioritylist[1]] and dist[0] < 10:
+        elif free_direction(currmove, prioritylist[1]) and dist[0] < 10:
             next = adj[prioritylist[1]]
             tiles.append(next)
             temp = (x, y)
             tempmove = currmove
             for i in range(10 - dist[1]):
-                if tempmove[prioritylist[2]]:
+                if free_direction(tempmove, prioritylist[2]):
                     temp = Map.adj_positions(temp[0], temp[1])[prioritylist[2]]
                     tiles.append(temp)
-                    tempmove = self.one_tile_movement(temp[0], temp[1])
+                    tempmove = self.move_data[temp[0]][temp[1]]
                 else:
                     break
             dist = (dist[0]+1, dist[1])
             self.bd_range_recursion(next[0], next[1], prioritylist, tiles, dist)
-        elif currmove[prioritylist[2]] and dist[1] < 10:
+        elif free_direction(currmove, prioritylist[2]) and dist[1] < 10:
             next = adj[prioritylist[2]]
             tiles.append(next)
             dist = (dist[0], dist[1]+1)
@@ -259,11 +260,11 @@ class Map:
     def surge_range(self, x, y, direction):
         if direction == 0 or direction == 2 or direction == 4 or direction == 6:
             temp = (x, y)
-            tempmove = self.one_tile_movement(temp[0], temp[1])
+            tempmove = self.move_data[temp[0]][temp[1]]
             for i in range(10):
-                if tempmove[direction]:
+                if free_direction(tempmove, direction):
                     temp = Map.adj_positions(temp[0], temp[1])[direction]
-                    tempmove = self.one_tile_movement(temp[0], temp[1])
+                    tempmove = self.move_data[temp[0]][temp[1]]
                 else:
                     if temp == (x, y):
                         return None
@@ -290,11 +291,11 @@ class Map:
         direction = (direction + 4) % 8
         if direction == 0 or direction == 2 or direction == 4 or direction == 6:
             temp = (x, y)
-            tempmove = self.one_tile_movement(temp[0], temp[1])
+            tempmove = self.move_data[temp[0]][temp[1]]
             for i in range(weprange-1):
-                if tempmove[direction]:
+                if free_direction(tempmove, direction):
                     temp = Map.adj_positions(temp[0], temp[1])[direction]
-                    tempmove = self.one_tile_movement(temp[0], temp[1])
+                    tempmove = self.move_data[temp[0]][temp[1]]
                 else:
                     return temp
             return temp
@@ -312,15 +313,15 @@ class Map:
 
     def one_tick_walk(self, x, y):
         tiles = []
-        start = self.one_tile_movement(x, y)
+        start = self.move_data[x][y]
         adj = Map.adj_positions(x, y)
-        for i in range(len(start)):
-            if start[i]:
+        for i in range(8):
+            if free_direction(start, i):
                 tiles.append(adj[i])
-                temp = self.one_tile_movement(adj[i][0], adj[i][1])
+                temp = self.move_data[adj[i][0]][adj[i][1]]
                 tempadj = Map.adj_positions(adj[i][0], adj[i][1])
-                for j in range(len(temp)):
-                    if temp[j]:
+                for j in range(8):
+                    if free_direction(temp, j):
                         tiles.append(tempadj[j])
         tiles = [*set(tiles)]
         tiles.remove((x, y))
@@ -329,23 +330,23 @@ class Map:
     def one_tick_walk_dir(self, x, y):
         tiles = []
         directions = []
-        start = self.one_tile_movement(x, y)
+        start = self.move_data[x][y]
         adj = Map.adj_positions(x, y)
         visited = {(x, y)}
         queue = []
-        for i in range(len(start)):
+        for i in range(8):
             j = (2*i + math.floor(i/4)) % 8
-            if start[j]:
+            if free_direction(start, j):
                 tiles.append(adj[j])
                 directions.append(j)
                 visited.add(adj[j])
                 queue.append(adj[j])
         while queue:
             current = queue.pop(0)
-            move = self.one_tile_movement(current[0], current[1])
+            move = self.move_data[current[0]][current[1]]
             tempadj = Map.adj_positions(current[0], current[1])
-            for i in range(len(move)):
-                if move[i]:
+            for i in range(8):
+                if free_direction(move, i):
                     if tempadj[i] not in visited:
                         tiles.append(tempadj[i])
                         directions.append(i)
@@ -354,11 +355,11 @@ class Map:
 
     def one_tile_walk(self, x, y):
         tiles = []
-        move = self.one_tile_movement(x, y)
+        move = self.move_data[x][y]
         adj = Map.adj_positions(x, y)
-        for i in range(len(move)):
+        for i in range(8):
             j = (2*i + math.floor(i/4)) % 8
-            if move[j]:
+            if free_direction(move, j):
                 tiles.append(adj[j])
         return tiles
 
@@ -414,6 +415,26 @@ class Map:
                 single.append(i)
         return [single, double, triple]
 
+    def process_move_data(self):
+        move_data = []
+        cells = self.cells
+        for x in range(len(cells)):
+            column = []
+            for y in range(len(cells[0])):
+                adj = self.one_tile_movement(x, y)
+                data = 0
+                for i in range(len(adj)):
+                    if adj[i]:
+                        data += 2**i
+                column.append(data)
+            move_data.append(column)
+        self.move_data = move_data
+
+
+
+def free_direction(i, direction):
+        t = [1, 2, 4, 8, 16, 32, 64, 128]
+        return math.floor(i/t[direction]) % 2 != 0
 
 
 def combine_base_images(name):

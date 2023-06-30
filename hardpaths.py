@@ -5,13 +5,14 @@ import time
 
 if __name__ == '__main__':
 
-    map1 = create_map("PiscNorth")
+    map1 = create_map("WestArdy")
     map1.create_image()
-    map1.color_tiles([(53, 39)], (255, 0, 255, 255))
-    map1.color_tiles([(69, 84)], (255, 0, 255, 255))
-    test_start = State(map1, (53, 39), 0, [0, 0, 0], 0)
+    map1.process_move_data()
+    map1.color_tiles([(106, 42)], (255, 0, 255, 255))
+    map1.color_tiles([(56, 44)], (255, 0, 255, 255))
+    test_start = State(map1, (106, 42), 0, [0, 0, 0], 5)
     st = time.time()
-    test_path = a_star_end_buffer(test_start, (69, 84), map1, l_infinity)
+    test_path = a_star_end_buffer(test_start, (56, 44), map1, l_infinity_cds)
     et = time.time()
     tiles = []
     directions = []
