@@ -839,4 +839,35 @@ def l_infinity_cds(state, end):
             ticks += 1
     return ticks
 
-
+def walk_dist_cds(state, end):
+    state = state.update()
+    distance = state.map.heuristic_data[state.pos[0]][state.pos[1]]
+    print(distance)
+    if distance <= 0:
+        return 0
+    ticks_left = distance
+    ticks = 0
+    while ticks_left > 0:
+        curr = state.min_cd()
+        if curr[0] - ticks >= ticks_left:
+            ticks += ticks_left
+            break
+        ticks_left = ticks_left - (curr[0] - ticks)
+        ticks = curr[0]
+        if curr[1] == "se":
+            ticks_left -= 6
+            state.secd = [17 + ticks, max(2, state.secd[1]) + ticks, 17 + ticks]
+            ticks += 1
+        elif curr[1] == "s":
+            ticks_left -= 6
+            state.secd = [max(2, state.secd[1]) + ticks, 17 + ticks, max(2, state.secd[1]) + ticks]
+            ticks += 1
+        elif curr[1] == "e":
+            ticks_left -= 4.5
+            state.secd = [max(2, state.secd[1]) + ticks, max(2, state.secd[1]) + ticks, 17 + ticks]
+            ticks += 1
+        elif curr[1] == "bd":
+            ticks_left -= 6
+            state.bdcd = 17 + ticks
+            ticks += 1
+    return ticks

@@ -1,13 +1,15 @@
 from PIL import Image, ImageDraw
 import math
+import numpy as np
 
 img_cell_size = 5
 
 class Map:
     def __init__(self, cells, walls):
-        self.cells = cells
-        self.walls = walls
+        self.cells = np.asarray(cells)
+        self.walls = np.asarray(walls)
         self.move_data = []
+        self.heuristic_data = []
         self.radius = 20
         self.goals = []
         self.image = Image.new("RGBA", size=(len(cells)*(img_cell_size+1)-1, len(cells[0])*(img_cell_size+1)-1), color=(255, 255, 255, 255))
@@ -428,7 +430,22 @@ class Map:
                         data += 2**i
                 column.append(data)
             move_data.append(column)
-        self.move_data = move_data
+        self.move_data = np.asarray(move_data)
+
+    def process_heuristic_data(self, goal):
+        heuristic_data = np.zeros(self.cells.shape) - 1
+        heuristic_data[goal[0]][goal[1]] = 0
+        visited = {goal}
+        queue = [goal]
+        while queue:
+            node = queue.pop(0)
+            adj = self.one_tick_walk_dir(node[0], node[1])[0]
+            for tile in adj:
+                if tile not in visited:
+                    heuristic_data[tile[0]][tile[1]] = heuristic_data[node[0]][node[1]] + 1
+                    queue.append(tile)
+                    visited.add(tile)
+        self.heuristic_data = heuristic_data
 
 
 
