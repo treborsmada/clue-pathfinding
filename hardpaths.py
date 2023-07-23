@@ -9,12 +9,12 @@ if __name__ == '__main__':
     map1 = create_map("Braindeath")
     map1.create_image()
     map1.process_move_data()
-
+    map1.process_bd_data()
     # for x in range(map1.heuristic_data.shape[0]):
     #     for y in range(map1.heuristic_data.shape[1]):
     #         if map1.heuristic_data[x][y] != -1:
     #             map1.color_tiles([(x, y)], (0, 255, 0, (int(map1.heuristic_data[x][y]))*20))
-    start = (12, 26)
+    start = (11, 26)
     end = (21, 42)
     map1.color_tiles([start, end], (255, 0, 255, 255))
     test_start = State(map1, start, 0, [0, 0, 0], 1)

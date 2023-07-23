@@ -10,6 +10,7 @@ class Map:
         self.walls = np.asarray(walls)
         self.move_data = []
         self.heuristic_data = []
+        self.bd_data = None
         self.radius = 20
         self.goals = []
         self.image = Image.new("RGBA", size=(len(cells)*(img_cell_size+1)-1, len(cells[0])*(img_cell_size+1)-1), color=(255, 255, 255, 255))
@@ -121,12 +122,23 @@ class Map:
         return tiles
 
     def bd_range(self, x, y):
-        tiles = []
-        self.bd_range_recursion(x, y, [1, 2, 0], tiles, (0, 0))
-        self.bd_range_recursion(x, y, [3, 2, 4], tiles, (0, 0))
-        self.bd_range_recursion(x, y, [5, 6, 4], tiles, (0, 0))
-        self.bd_range_recursion(x, y, [7, 6, 0], tiles, (0, 0))
-        return [*set(tiles)]
+        if self.bd_data is not None:
+            tiles = []
+            info = self.bd_data[x][y]
+            for i in range(21):
+                for j in range(21):
+                    if info & (2**(j + i*21)):
+                        u = x - 10 + j
+                        v = y + 10 - i
+                        tiles.append((u, v))
+            return tiles
+        else:
+            tiles = []
+            self.bd_range_recursion(x, y, [1, 2, 0], tiles, (0, 0))
+            self.bd_range_recursion(x, y, [3, 2, 4], tiles, (0, 0))
+            self.bd_range_recursion(x, y, [5, 6, 4], tiles, (0, 0))
+            self.bd_range_recursion(x, y, [7, 6, 0], tiles, (0, 0))
+            return [*set(tiles)]
 
     def bd_range_recursion(self, x, y, prioritylist, tiles, dist):
         currmove = self.move_data[x][y]
@@ -446,6 +458,24 @@ class Map:
                     queue.append(tile)
                     visited.add(tile)
         self.heuristic_data = heuristic_data
+
+    def process_bd_data(self):
+        bd_data = np.zeros(self.cells.shape, dtype=object)
+        length, height = self.cells.shape
+        for x in range(length):
+            for y in range(height):
+                bd = self.bd_range(x, y)
+                info = 0
+                for i in range(21):
+                    for j in range(21):
+                        u = x + j - 10
+                        v = y - i + 10
+                        if u >= 0 and v >= 0 and u < length and v < height:
+                            if (u,v) in bd:
+                                info += 2**(j + i*21)
+                bd_data[x][y] = info
+        self.bd_data = bd_data
+
 
 
 

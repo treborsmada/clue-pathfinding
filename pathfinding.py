@@ -842,7 +842,6 @@ def l_infinity_cds(state, end):
 def walk_dist_cds(state, end):
     state = state.update()
     distance = state.map.heuristic_data[state.pos[0]][state.pos[1]]
-    print(distance)
     if distance <= 0:
         return 0
     ticks_left = distance
