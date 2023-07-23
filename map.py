@@ -8,9 +8,11 @@ class Map:
     def __init__(self, cells, walls):
         self.cells = np.asarray(cells)
         self.walls = np.asarray(walls)
+        self.doors = []
         self.move_data = []
         self.heuristic_data = []
         self.bd_data = None
+        self.shortcuts = []
         self.radius = 20
         self.goals = []
         self.image = Image.new("RGBA", size=(len(cells)*(img_cell_size+1)-1, len(cells[0])*(img_cell_size+1)-1), color=(255, 255, 255, 255))
@@ -476,7 +478,18 @@ class Map:
                 bd_data[x][y] = info
         self.bd_data = bd_data
 
+    def add_shortcut(self, a, b, direction, time, mandatory):
+        self.shortcuts.append((a, b, direction, time, mandatory))
 
+    def add_door(self, x, y, direction):
+        if direction == 0:
+            self.doors.append((1, y+1, x))
+        if direction == 1:
+            self.doors.append((0, x+1, y))
+        if direction == 2:
+            self.doors.append((0, y, x))
+        if direction == 3:
+            self.doors.append((0, x, y))
 
 
 def free_direction(i, direction):

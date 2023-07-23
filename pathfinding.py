@@ -6,20 +6,21 @@ movelist = ["walk", "surge", "bd", "bd_surge", "surge_bd", "bd_escape", "escape_
             "escape_walk"]
 
 class State:
-    def __init__(self, map, pos, direction, secd=[0, 0, 0], bdcd=0):
+    def __init__(self, map, pos, direction, secd=[0, 0, 0], bdcd=0, wait_time=0):
         self.map = map
         self.pos = pos
         self.direction = direction
         self.secd = secd.copy()
         self.bdcd = bdcd
+        self.wait_time = wait_time
 
     def __eq__(self, other):
         if isinstance(other, State):
-            return self.map == other.map and self.pos == other.pos and self.direction == other.direction and self.secd == other.secd and self.bdcd == other.bdcd
+            return self.map == other.map and self.pos == other.pos and self.direction == other.direction and self.secd == other.secd and self.bdcd == other.bdcd and self.wait_time == other.wait_time
         return False
 
     def __hash__(self):
-        return hash((self.pos, self.direction, tuple(self.secd), self.bdcd))
+        return hash((self.pos, self.direction, tuple(self.secd), self.bdcd, self.wait_time))
 
     def update(self):
         new_secd = self.secd.copy()
@@ -29,29 +30,33 @@ class State:
                 new_secd[i] = new_secd[i]-1
         if not new_bdcd == 0:
             new_bdcd = new_bdcd - 1
-        return State(self.map, self.pos, self.direction, new_secd, new_bdcd)
+        if self.wait_time > 0:
+            new_wait_time = self.wait_time - 1
+        else:
+            new_wait_time = 0
+        return State(self.map, self.pos, self.direction, new_secd, new_bdcd, new_wait_time)
 
     def move(self, x, y, direction):
-        return State(self.map, (x, y), direction, self.secd, self.bdcd)
+        return State(self.map, (x, y), direction, self.secd, self.bdcd, self.wait_time)
 
     def surge(self):
         new_secd = self.secd.copy()
         if self.secd[0] == 0:
             new_pos = self.map.surge_range(self.pos[0], self.pos[1], self.direction)
             if new_pos == self.pos:
-                return State(self.map, self.pos, self.direction, self.secd, self.bdcd)
+                return State(self.map, self.pos, self.direction, self.secd, self.bdcd, self.wait_time)
             if self.secd[1] < 2:
-                return State(self.map, new_pos, self.direction, [17, 2, 17], self.bdcd)
+                return State(self.map, new_pos, self.direction, [17, 2, 17], self.bdcd, self.wait_time)
             else:
-                return State(self.map, new_pos, self.direction, [17, new_secd[1], 17], self.bdcd)
+                return State(self.map, new_pos, self.direction, [17, new_secd[1], 17], self.bdcd, self.wait_time)
         elif self.secd[1] == 0:
             new_pos = self.map.surge_range(self.pos[0], self.pos[1], self.direction)
             if new_pos == self.pos:
-                return State(self.map, self.pos, self.direction, self.secd, self.bdcd)
+                return State(self.map, self.pos, self.direction, self.secd, self.bdcd, self.wait_time)
             if self.secd[0] < 2:
-                return State(self.map, new_pos, self.direction, [2, 17, 2], self.bdcd)
+                return State(self.map, new_pos, self.direction, [2, 17, 2], self.bdcd, self.wait_time)
             else:
-                return State(self.map, new_pos, self.direction, [new_secd[0], 17, new_secd[2]], self.bdcd)
+                return State(self.map, new_pos, self.direction, [new_secd[0], 17, new_secd[2]], self.bdcd, self.wait_time)
         else:
             print(self.pos)
             raise Exception("Surge is on cooldown")
@@ -61,26 +66,26 @@ class State:
         if self.secd[0] == 0:
             new_pos = self.map.escape_range(self.pos[0], self.pos[1], self.direction)
             if new_pos == self.pos:
-                return State(self.map, self.pos, self.direction, self.secd, self.bdcd)
+                return State(self.map, self.pos, self.direction, self.secd, self.bdcd, self.wait_time)
             if self.secd[2] < 2:
-                return State(self.map, new_pos, self.direction, [17, 17, 2], self.bdcd)
+                return State(self.map, new_pos, self.direction, [17, 17, 2], self.bdcd, self.wait_time)
             else:
-                return State(self.map, new_pos, self.direction, [17, 17, new_secd[2]], self.bdcd)
+                return State(self.map, new_pos, self.direction, [17, 17, new_secd[2]], self.bdcd, self.wait_time)
         elif self.secd[2] == 0:
             new_pos = self.map.escape_range(self.pos[0], self.pos[1], self.direction)
             if new_pos == self.pos:
-                return State(self.map, self.pos, self.direction, self.secd, self.bdcd)
+                return State(self.map, self.pos, self.direction, self.secd, self.bdcd, self.wait_time)
             if self.secd[0] < 2:
-                return State(self.map, new_pos, self.direction, [2, 2, 17], self.bdcd)
+                return State(self.map, new_pos, self.direction, [2, 2, 17], self.bdcd, self.wait_time)
             else:
-                return State(self.map, new_pos, self.direction, [new_secd[0], new_secd[1], 17], self.bdcd)
+                return State(self.map, new_pos, self.direction, [new_secd[0], new_secd[1], 17], self.bdcd, self.wait_time)
         else:
             print(self.pos)
             raise Exception("Escape is on cooldown")
 
     def bd(self, x, y, direction):
         if self.bdcd == 0:
-            return State(self.map, (x, y), direction, self.secd, 17)
+            return State(self.map, (x, y), direction, self.secd, 17, self.wait_time)
 
     def can_bd(self):
         return self.bdcd == 0
@@ -583,6 +588,7 @@ def a_star_end_buffer(start_state, end, map, heuristic):
     queue = qqueue.PriorityQueue()
     queue.put((0, next(unique), (path, path_moves)))
     cost: dict[State, int] = {start_state: 0}
+    shortcuts = map.shortcuts
     first = True
     while not queue.empty():
         path = queue.get()[2]
@@ -591,6 +597,17 @@ def a_star_end_buffer(start_state, end, map, heuristic):
         if not first:
             node = node.update()
         first = False
+        for shortcut in shortcuts:
+            if shortcut[4] == True:
+                if shortcut[0] == node.pos:
+                    time = shortcut[3]
+                    while time > 0:
+                        node = node.update()
+                        time = time - 1
+                        path[1].append("shortcut")
+                    node = node.move(shortcut[1][0], shortcut[1][1], shortcut[2])
+                    path[0].append((node, node, node))
+
         if end[0] - 1 <= node.pos[0] <= end[0] + 1 and end[1] - 1 <= node.pos[1] <= end[1] + 1:
             return path
         # wait
